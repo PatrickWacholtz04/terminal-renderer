@@ -128,7 +128,12 @@ impl Renderer {
         }
     }
 
-    // fn draw_triangle(&)
+    fn draw_triangle(&mut self, point0: Point, point1: Point, point2: Point, color: RGB) {
+        // Draw lines connecting points into a triangle
+        self.draw_line(point0, point1, color);
+        self.draw_line(point1, point2, color);
+        self.draw_line(point2, point0, color);
+    }
 
     fn render(&self) {
         for y in ( 0..self.out_h).step_by(2) {
@@ -161,53 +166,21 @@ impl Renderer {
 
 fn main() {
     let mut renderer = Renderer::new();
-    renderer.draw_line(
-        Point { x: 13, y: 13 },
-        Point { x: 25, y: 18 },
-        RGB { r: 255, g: 0, b: 0 },
-    );
+    
+    renderer.draw_triangle(
+        Point{x: 5, y: 5}, 
+        Point{x: 22, y: 13}, 
+        Point{x: 5, y:20},
+        RGB{r: 0, g:0, b:255}
+    ); 
 
-    renderer.draw_line(
-        Point { x: 13, y: 13 },
-        Point { x: 18, y: 25 },
-        RGB { r: 0, g: 255, b: 0 },
-    );
+    renderer.draw_triangle(
+        Point{x: 5, y: 5}, 
+        Point{x: 22, y: 13}, 
+        Point{x: 14, y:1},
+        RGB{r: 255, g:0, b: 0}
+    ); 
 
-    renderer.draw_line(
-        Point { x: 13, y: 13 },
-        Point { x: 9, y: 25 },
-        RGB { r: 0, g: 0, b: 255 },
-    );
-
-    renderer.draw_line(
-        Point { x: 13, y: 13 },
-        Point { x: 0, y: 18 },
-        RGB { r: 255, g: 0, b: 0 },
-    );
-
-    renderer.draw_line(
-        Point { x: 13, y: 13 },
-        Point { x: 25, y: 9 },
-        RGB { r: 0, g: 0, b: 255 },
-    );
-
-    renderer.draw_line(
-        Point { x: 13, y: 13 },
-        Point { x: 18, y: 0 },
-        RGB { r: 0, g: 255, b: 0 },
-    );
-
-    renderer.draw_line(
-        Point { x: 13, y: 13 },
-        Point { x: 0, y: 9 },
-        RGB { r: 0, g: 255, b: 0 },
-    );
-
-    renderer.draw_line(
-        Point { x: 13, y: 13 },
-        Point { x: 9, y: 0 },
-        RGB { r: 255, g: 0, b: 0 },
-    );
     
     renderer.render();
 }
