@@ -8,6 +8,12 @@ struct RGB {
     b: u8,
 }
 
+#[derive(Default, Clone, Copy, Debug)]
+struct Point {
+    x: usize,
+    y: usize,
+}
+
 struct Renderer {
     out_w: usize,
     out_h: usize,
@@ -27,29 +33,39 @@ impl Renderer {
         
     }
 
-    fn set_pixel(&mut self, x: usize, y: usize, color: RGB) {
-        self.screen_buffer[x][y] = color;
+    fn set_pixel(&mut self, point: Point, color: RGB) {
+        self.screen_buffer[point.x][point.y] = color;
     }
 
-    fn draw_line(&mut self, x0: usize, y0: usize, x1: usize, y1: usize, color: RGB) {
+    fn draw_line(&mut self, point0: Point, point1: Point, color: RGB) {
         // Generate line using Bresenham's Line Algorithm
             // https://www.youtube.com/watch?v=CceepU1vIKo
+
+        let x0 = point0.x;
+        let x1 = point1.x;
+        let y0 = point0.y;
+        let y1 = point1.y;
 
         let dx = x1 as isize - x0 as isize;
         let dy = y1 as isize - y0 as isize;
 
         if dx.abs() > dy.abs() {
-            self.draw_line_horizontal(x0, y0, x1, y1, color);
+            self.draw_line_horizontal(point0, point1, color);
         }
         else {
-            self.draw_line_vertical(x0, y0, x1, y1, color);
+            self.draw_line_vertical(point0, point1, color);
         }
     }
-    
 
-    fn draw_line_horizontal(&mut self, mut x0: usize, mut y0: usize, mut x1: usize, mut y1: usize, color: RGB) {
+    fn draw_line_horizontal(&mut self, point0: Point, point1: Point, color: RGB) {
         // Generate line using Bresenham's Line Algorithm
             // https://www.youtube.com/watch?v=CceepU1vIKo
+
+        let mut x0 = point0.x;
+        let mut x1 = point1.x;
+        let mut y0 = point0.y;
+        let mut y1 = point1.y;
+
         if x0 > x1 {
             (x0, x1) = (x1, x0);
             (y0, y1) = (y1, y0);
@@ -65,7 +81,8 @@ impl Renderer {
             let mut y = y0 as isize;
             let mut p = 2*dy - dx;
             for i in 0..(dx+1) {
-                self.set_pixel(x0 + i as usize, y as usize, color);
+                
+                self.set_pixel(Point{x: x0 + i as usize, y: y as usize}, color);
 
                 if p >= 0 {
                     y += dir;
@@ -76,9 +93,15 @@ impl Renderer {
         }
     }
 
-    fn draw_line_vertical(&mut self, mut x0: usize, mut y0: usize, mut x1: usize, mut y1: usize, color: RGB) {
+    fn draw_line_vertical(&mut self, point0: Point, point1: Point, color: RGB) {
         // Generate line using Bresenham's Line Algorithm
             // https://www.youtube.com/watch?v=CceepU1vIKo
+
+        let mut x0 = point0.x;
+        let mut x1 = point1.x;
+        let mut y0 = point0.y;
+        let mut y1 = point1.y;
+
         if y0 > y1 {
             (x0, x1) = (x1, x0);
             (y0, y1) = (y1, y0);
@@ -94,7 +117,7 @@ impl Renderer {
             let mut x = x0 as isize;
             let mut p = 2*dx - dy;
             for i in 0..(dy+1) {
-                self.set_pixel(x as usize, y0 + i as usize, color);
+                self.set_pixel(Point{x: x as usize, y: y0 + i as usize}, color);
 
                 if p >= 0 {
                     x += dir;
@@ -105,6 +128,7 @@ impl Renderer {
         }
     }
 
+    // fn draw_triangle(&)
 
     fn render(&self) {
         for y in ( 0..self.out_h).step_by(2) {
@@ -137,21 +161,53 @@ impl Renderer {
 
 fn main() {
     let mut renderer = Renderer::new();
+    renderer.draw_line(
+        Point { x: 13, y: 13 },
+        Point { x: 25, y: 18 },
+        RGB { r: 255, g: 0, b: 0 },
+    );
 
-    renderer.set_pixel(13, 13, RGB{r: 255, g: 0, b: 0});
+    renderer.draw_line(
+        Point { x: 13, y: 13 },
+        Point { x: 18, y: 25 },
+        RGB { r: 0, g: 255, b: 0 },
+    );
 
-    renderer.draw_line(13,13, 25, 18, RGB{r: 255, g: 0, b: 0});
-    renderer.draw_line(13,13, 18, 25, RGB{r: 0, g: 255, b: 0});
+    renderer.draw_line(
+        Point { x: 13, y: 13 },
+        Point { x: 9, y: 25 },
+        RGB { r: 0, g: 0, b: 255 },
+    );
 
-    renderer.draw_line(13,13, 9, 25, RGB{r: 0, g: 0, b: 255});
-    renderer.draw_line(13,13, 0, 18, RGB{r: 255, g: 0, b: 0});
+    renderer.draw_line(
+        Point { x: 13, y: 13 },
+        Point { x: 0, y: 18 },
+        RGB { r: 255, g: 0, b: 0 },
+    );
 
-    renderer.draw_line(13,13, 25, 9, RGB{r: 0, g: 0, b: 255});
-    renderer.draw_line(13,13, 18, 0, RGB{r: 0, g: 255, b: 0});
+    renderer.draw_line(
+        Point { x: 13, y: 13 },
+        Point { x: 25, y: 9 },
+        RGB { r: 0, g: 0, b: 255 },
+    );
 
-    renderer.draw_line(13,13, 0, 9, RGB{r: 0, g: 255, b: 0});
-    renderer.draw_line(13,13, 9, 0, RGB{r: 255, g: 0, b: 0});
-   
+    renderer.draw_line(
+        Point { x: 13, y: 13 },
+        Point { x: 18, y: 0 },
+        RGB { r: 0, g: 255, b: 0 },
+    );
+
+    renderer.draw_line(
+        Point { x: 13, y: 13 },
+        Point { x: 0, y: 9 },
+        RGB { r: 0, g: 255, b: 0 },
+    );
+
+    renderer.draw_line(
+        Point { x: 13, y: 13 },
+        Point { x: 9, y: 0 },
+        RGB { r: 255, g: 0, b: 0 },
+    );
     
     renderer.render();
 }
