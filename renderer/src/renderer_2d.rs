@@ -29,12 +29,13 @@ use std::{thread, time::Duration};
 const OUT_W:usize = 200;
 const OUT_H:usize = 100;
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq)]
 pub struct RGB {
     pub r: u8,
     pub g: u8,
     pub b: u8,
 }
+
 
 impl RGB {
     fn to_crossterm(self) -> Color {
@@ -56,34 +57,45 @@ pub struct Renderer {
     pub out_w: usize,
     pub out_h: usize,
     pub screen_buffer: Vec<Vec<RGB>>,
+    previous_buffer: Vec<Vec<RGB>>,
     draw_pixel: char,
     stdout: Stdout,
     pub target_framerate: u16,
+    pub first_frame: bool,
 }
 
 pub struct InputHandler {
     pub exit: bool,
+    pub terminal_resized: bool,
 }
 
 impl InputHandler {
     pub fn new() -> Self {
         Self {
             exit: false,
+            terminal_resized: false,
         }
     }
 
     pub fn update(&mut self) -> Result<()> {
+        self.terminal_resized = false;
         while event::poll(Duration::ZERO)? {
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-                match code {
-                    KeyCode::Esc => {
-                        self.exit = true;
+            match event::read()? {
+                Event::Key(KeyEvent { code, .. }) => {
+                    match code {
+                        KeyCode::Esc => {
+                            self.exit = true;
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
+
+                Event::Resize(width, height) => {
+                    self.terminal_resized = true;
+                }
+
+                _ => {}
             }
-
-
         }
 
         Ok(())
@@ -98,9 +110,11 @@ impl Renderer {
             out_w: OUT_W,
             out_h: OUT_H,
             screen_buffer: vec![vec![RGB::default(); OUT_H]; OUT_W],
+            previous_buffer: vec![vec![RGB::default(); OUT_H]; OUT_W],
             draw_pixel: '▄',
             stdout: stdout(),
             target_framerate: 60,
+            first_frame: true,
         }
         
     }
@@ -219,25 +233,36 @@ impl Renderer {
         // Loop through screen buffer
         for y in ( 0..self.out_h).step_by(2) {
             for x in 0..self.out_w {
-                let rgb_top = self.screen_buffer[x][y];
-                let rgb_btm = 
-                    if y + 1 < self.out_h { self.screen_buffer[x][y+1] }
-                    else { RGB::default() };
+                let top = self.screen_buffer[x][y];
+
+                let bottom = if y + 1 < self.out_h {
+                    self.screen_buffer[x][y + 1]
+                } else {
+                    RGB::default()
+                };
+
+                let old_top = self.previous_buffer[x][y];
+                let old_bottom = if y + 1 < self.out_h {
+                    self.previous_buffer[x][y + 1]
+                } else {
+                    RGB::default()
+                };
+
+                // Nothing changed.
+                if !self.first_frame && top == old_top && bottom == old_bottom {
+                    continue;
+                }
 
                 // Add draw pixel to queue with color
                 queue!(
                     self.stdout,
-                    SetForegroundColor(rgb_btm.to_crossterm()),
-                    SetBackgroundColor(rgb_top.to_crossterm()),
+                    cursor::MoveTo(x as u16, (y / 2) as u16),
+                    SetForegroundColor(bottom.to_crossterm()),
+                    SetBackgroundColor(top.to_crossterm()),
                     Print(self.draw_pixel),
                     ResetColor,
                 )?;
             }
-            // Move cursor to start of next line
-            queue!(
-                self.stdout,
-                cursor::MoveTo(0, (y / 2 + 1) as u16),
-            )?;
         }
 
         // Clear color settings
@@ -247,6 +272,15 @@ impl Renderer {
         )?;
         // Flush queue to screen
         self.stdout.flush()?;
+
+        // Swap the frame buffer at the end of each frame
+        std::mem::swap(
+            &mut self.screen_buffer,
+            &mut self.previous_buffer,
+        );
+
+        self.first_frame = false;
+
         Ok(())
     }
 

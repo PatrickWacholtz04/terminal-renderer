@@ -203,6 +203,9 @@ fn main() -> Result<()> {
         if input_handler.exit {
             break;
         }
+        if input_handler.terminal_resized {
+            renderer_2d.first_frame = true;
+        }
 
         // Clear the logical framebuffer.
         renderer_2d.screen_buffer.fill(
