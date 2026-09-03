@@ -1,11 +1,43 @@
-const OUT_W:usize = 26;
-const OUT_H:usize = 26;
+use crossterm::{
+    cursor,
+    queue,
+    style::{
+        Color,
+        Print,
+        ResetColor,
+        SetBackgroundColor,
+        SetForegroundColor,
+    },
+    terminal::{
+        self,
+        EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
+    ExecutableCommand,
+};
+
+use std::io::{Result, Stdout, Write, stdout};
+use std::{thread, time::Duration};
+
+
+const OUT_W:usize = 100;
+const OUT_H:usize = 100;
 
 #[derive(Default, Clone, Copy, Debug)]
 struct RGB {
     r: u8,
     g: u8,
     b: u8,
+}
+
+impl RGB {
+    fn to_crossterm(self) -> Color {
+        Color::Rgb {
+            r: self.r,
+            g: self.g,
+            b: self.b,
+        }
+    }
 }
 
 #[derive(Default, Clone, Copy, Debug)]
@@ -19,6 +51,7 @@ struct Renderer {
     out_h: usize,
     screen_buffer: Vec<Vec<RGB>>,
     draw_pixel: char,
+    stdout: Stdout,
 }
 
 impl Renderer {
@@ -29,6 +62,7 @@ impl Renderer {
             out_h: OUT_H,
             screen_buffer: vec![vec![RGB::default(); OUT_H]; OUT_W],
             draw_pixel: '▄',
+            stdout: stdout(),
         }
         
     }
@@ -135,6 +169,48 @@ impl Renderer {
         self.draw_line(point2, point0, color);
     }
 
+    fn render_crossterm(&mut self) -> Result<()> {     
+        // Reset cursor position to top left instead of letting terminal scroll
+        queue!(
+            self.stdout,
+            cursor::MoveTo(0, 0),
+        )?;
+
+        // Loop through screen buffer
+        for y in ( 0..self.out_h).step_by(2) {
+            for x in 0..self.out_w {
+                let rgb_top = self.screen_buffer[x][y];
+                let rgb_btm = 
+                    if y + 1 < self.out_h { self.screen_buffer[x][y+1] }
+                    else { RGB::default() };
+
+                // Add draw pixel to queue with color
+                queue!(
+                    self.stdout,
+                    SetForegroundColor(rgb_btm.to_crossterm()),
+                    SetBackgroundColor(rgb_top.to_crossterm()),
+                    Print(self.draw_pixel),
+                    ResetColor,
+                )?;
+            }
+            // Move cursor to start of next line
+            queue!(
+                self.stdout,
+                cursor::MoveTo(0, (y / 2 + 1) as u16),
+            )?;
+        }
+
+        // Clear color settings
+        queue!(
+            self.stdout,
+            ResetColor,
+        )?;
+        // Flush queue to screen
+        self.stdout.flush()?;
+        Ok(())
+    }
+
+
     fn render(&self) {
         for y in ( 0..self.out_h).step_by(2) {
             for x in 0..self.out_w {
@@ -160,27 +236,64 @@ impl Renderer {
         }
     }
 
-
 }
 
 
-fn main() {
+fn main() -> Result<()> {
     let mut renderer = Renderer::new();
-    
-    renderer.draw_triangle(
-        Point{x: 5, y: 5}, 
-        Point{x: 22, y: 13}, 
-        Point{x: 5, y:20},
-        RGB{r: 0, g:0, b:255}
-    ); 
 
-    renderer.draw_triangle(
-        Point{x: 5, y: 5}, 
-        Point{x: 22, y: 13}, 
-        Point{x: 14, y:1},
-        RGB{r: 255, g:0, b: 0}
-    ); 
+    renderer.stdout.execute(EnterAlternateScreen)?;
+    terminal::enable_raw_mode()?;
+    renderer.stdout.execute(cursor::Hide)?;
 
-    
-    renderer.render();
+    let result = run(&mut renderer);
+
+    // Always restore terminal state.
+    renderer.stdout.execute(cursor::Show)?;
+    terminal::disable_raw_mode()?;
+    renderer.stdout.execute(LeaveAlternateScreen)?;
+
+    result
+}
+
+
+fn run(renderer: &mut Renderer) -> Result<()> {
+    let mut frame_counter = 0;
+
+    loop {
+        frame_counter += 1;
+
+        // Clear the logical framebuffer.
+        renderer.screen_buffer.fill(
+            vec![RGB::default(); renderer.out_h]
+        );
+
+        renderer.draw_triangle(
+            Point { x: 5, y: 5 },
+            Point { x: 22, y: 13 },
+            Point { x: 5, y: 20 },
+            RGB {
+                r: 0,
+                g: 0,
+                b: 255,
+            },
+        );
+
+        renderer.draw_triangle(
+            Point { x: 5, y: 5 },
+            Point { x: 22, y: 13 },
+            Point { x: 14, y: 1 },
+            RGB {
+                r: 255,
+                g: 0,
+                b: 0,
+            },
+        );
+
+        renderer.render_crossterm()?;
+
+        thread::sleep(Duration::from_millis(16));
+    }
+
+
 }
