@@ -33,6 +33,7 @@ struct Mat4x4 {
 struct Renderer {
     mesh_cube: Mesh,
     mat_proj: Mat4x4,
+    v_camera: Vec3d,
 }
 
 impl Renderer {
@@ -142,6 +143,7 @@ impl Renderer {
         Self { 
             mesh_cube,
             mat_proj,
+            v_camera: Vec3d::default(),
         }
 
     }
@@ -159,9 +161,10 @@ impl Renderer {
             o.y /= w;
             o.z /= w;
         }
-
         return o;
     }
+
+
 
 }
 
@@ -176,16 +179,16 @@ fn main() -> Result<()> {
     let mut renderer = Renderer::new();
 
     // Projection Matrix
-    let fNear = 0.1f32;
-    let fFar = 1000.0f32;
-    let fFov = 90.0f32;
-    let fAspectRatio = renderer_2d.out_h as f32 / renderer_2d.out_w as f32;
-    let fFovRad = 1.0f32 / (fFov * 0.5 / 180.0 * 3.14159).tan();
+    let f_near = 0.1f32;
+    let f_far = 1000.0f32;
+    let f_fov = 90.0f32;
+    let f_aspect_ratio = renderer_2d.out_h as f32 / renderer_2d.out_w as f32;
+    let f_fov_rad = 1.0f32 / (f_fov * 0.5 / 180.0 * 3.14159).tan();
 
-    renderer.mat_proj.m[0][0] = fAspectRatio * fFovRad;
-    renderer.mat_proj.m[1][1] = fFovRad;
-    renderer.mat_proj.m[2][2] = fFar / (fFar - fNear);
-    renderer.mat_proj.m[3][2] = (-fFar * fNear) / (fFar - fNear);
+    renderer.mat_proj.m[0][0] = f_aspect_ratio * f_fov_rad;
+    renderer.mat_proj.m[1][1] = f_fov_rad;
+    renderer.mat_proj.m[2][2] = f_far / (f_far - f_near);
+    renderer.mat_proj.m[3][2] = (-f_far * f_near) / (f_far - f_near);
     renderer.mat_proj.m[2][3] = 1.0f32;
     renderer.mat_proj.m[3][3] = 0.0f32;
 
@@ -240,43 +243,84 @@ fn main() -> Result<()> {
             let mut rotated_z = Triangle::default();
             let mut rotated_zx = Triangle::default();
 
-
+            // Rotate along Z axis
             rotated_z.p[0] = Renderer::multiply_matrix_vector(tri.p[0], mat_rot_z);
             rotated_z.p[1] = Renderer::multiply_matrix_vector(tri.p[1], mat_rot_z);
             rotated_z.p[2] = Renderer::multiply_matrix_vector(tri.p[2], mat_rot_z);
 
+            // Rotate along X Axis
             rotated_zx.p[0] = Renderer::multiply_matrix_vector(rotated_z.p[0], mat_rot_x);
             rotated_zx.p[1] = Renderer::multiply_matrix_vector(rotated_z.p[1], mat_rot_x);
             rotated_zx.p[2] = Renderer::multiply_matrix_vector(rotated_z.p[2], mat_rot_x);
 
+            // Offset onto screen
             let mut translated = rotated_zx;
             translated.p[0].z = rotated_zx.p[0].z + 3.0;
             translated.p[1].z = rotated_zx.p[1].z + 3.0;
             translated.p[2].z = rotated_zx.p[2].z + 3.0;
+
+            let mut normal = Vec3d::default();
+            let mut line1 = Vec3d::default();
+            let mut line2 = Vec3d::default();
+
+            line1.x = translated.p[1].x - translated.p[0].x;
+            line1.y = translated.p[1].y - translated.p[0].y;
+            line1.z = translated.p[1].z - translated.p[0].z;
+
+            line2.x = translated.p[2].x - translated.p[0].x;
+            line2.y = translated.p[2].y - translated.p[0].y;
+            line2.z = translated.p[2].z - translated.p[0].z;
+
+            normal.x = line1.y * line2.z - line1.z * line2.y;
+            normal.y = line1.z * line2.x - line1.x * line2.z;
+            normal.z = line1.x * line2.y - line1.y * line2.x;
+
+            let l = (normal.x*normal.x + normal.y*normal.y + normal.z*normal.z).sqrt();
+            normal.x /= l; normal.y /= l; normal.z /= l;
             
-            projected.p[0] = Renderer::multiply_matrix_vector(translated.p[0], renderer.mat_proj);
-            projected.p[1] = Renderer::multiply_matrix_vector(translated.p[1], renderer.mat_proj);
-            projected.p[2] = Renderer::multiply_matrix_vector(translated.p[2], renderer.mat_proj);
 
-            // Scale into view
-            projected.p[0].x += 1.0;    projected.p[0].y += 1.0;
-            projected.p[1].x += 1.0;    projected.p[1].y += 1.0;
-            projected.p[2].x += 1.0;    projected.p[2].y += 1.0;
+            if (normal.x * translated.p[0].x - renderer.v_camera.x) +
+                (normal.y * translated.p[0].y - renderer.v_camera.y) +
+                (normal.z * translated.p[0].z - renderer.v_camera.z) < 0.0 {
+                projected.p[0] = Renderer::multiply_matrix_vector(translated.p[0], renderer.mat_proj);
+                projected.p[1] = Renderer::multiply_matrix_vector(translated.p[1], renderer.mat_proj);
+                projected.p[2] = Renderer::multiply_matrix_vector(translated.p[2], renderer.mat_proj);
 
-            projected.p[0].x *= 0.5 * renderer_2d.out_w as f32;
-            projected.p[0].y *= 0.5 * renderer_2d.out_h as f32;
-            projected.p[1].x *= 0.5 * renderer_2d.out_w as f32;
-            projected.p[1].y *= 0.5 * renderer_2d.out_h as f32;
-            projected.p[2].x *= 0.5 * renderer_2d.out_w as f32;
-            projected.p[2].y *= 0.5 * renderer_2d.out_h as f32;
+                // Scale into view
+                projected.p[0].x += 1.0;    projected.p[0].y += 1.0;
+                projected.p[1].x += 1.0;    projected.p[1].y += 1.0;
+                projected.p[2].x += 1.0;    projected.p[2].y += 1.0;
 
-            renderer_2d.draw_triangle(Point{x: projected.p[0].x as usize, y: projected.p[0].y as usize}, 
-                                    Point{x: projected.p[1].x as usize, y: projected.p[1].y as usize},
-                                    Point{x: projected.p[2].x as usize, y: projected.p[2].y as usize},
-                                    RGB{r: 255, g: 255, b:255}
-            );
+                projected.p[0].x *= 0.5 * renderer_2d.out_w as f32;
+                projected.p[0].y *= 0.5 * renderer_2d.out_h as f32;
+                projected.p[1].x *= 0.5 * renderer_2d.out_w as f32;
+                projected.p[1].y *= 0.5 * renderer_2d.out_h as f32;
+                projected.p[2].x *= 0.5 * renderer_2d.out_w as f32;
+                projected.p[2].y *= 0.5 * renderer_2d.out_h as f32;
+
+                // Rasterize triangle
+                
+                renderer_2d.fill_triangle(Point{x: projected.p[0].x as usize, y: projected.p[0].y as usize}, 
+                                        Point{x: projected.p[1].x as usize, y: projected.p[1].y as usize},
+                                        Point{x: projected.p[2].x as usize, y: projected.p[2].y as usize},
+                                        RGB{r: 255, g: 255, b:255}
+                );
+
+            }   
 
         }
+
+        
+        // renderer_2d.fill_triangle(
+        //     Point { x: 5, y: 5 },
+        //     Point { x: 5, y: 20 },
+        //     Point { x: 22, y: 13 },
+        //     RGB {
+        //         r: 255,
+        //         g: 255,
+        //         b: 255,
+        //     },
+        // );
 
         renderer_2d.render()?;
 

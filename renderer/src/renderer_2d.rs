@@ -90,7 +90,7 @@ impl InputHandler {
                     }
                 }
 
-                Event::Resize(width, height) => {
+                Event::Resize(_width, _height) => {
                     self.terminal_resized = true;
                 }
 
@@ -113,7 +113,7 @@ impl Renderer {
             previous_buffer: vec![vec![RGB::default(); OUT_H]; OUT_W],
             draw_pixel: '▄',
             stdout: stdout(),
-            target_framerate: 60,
+            target_framerate: 30,
             first_frame: true,
         }
         
@@ -221,6 +221,204 @@ impl Renderer {
         self.draw_line(point0, point1, color);
         self.draw_line(point1, point2, color);
         self.draw_line(point2, point0, color);
+    }
+
+    pub fn fill_triangle(&mut self, mut point0: Point, mut point1: Point, mut point2: Point, color: RGB) {
+        // https://github.com/OneLoneCoder/Javidx9/blob/master/ConsoleGameEngine/olcConsoleGameEngine.h#L537
+
+        let mut t1x: isize;   let mut t2x: isize;
+        let mut y: isize;
+        let mut min_x: isize; let mut max_x: isize;
+        let mut t1xp: isize;  let mut t2xp: isize;
+
+        let mut changed1 = false;   let mut changed2 = false;
+        let mut sign_x1:i8;
+        let mut sign_x2:i8;
+
+        let mut dx1: isize;   let mut dy1: isize;
+        let mut dx2: isize;   let mut dy2: isize;
+
+        let mut e1: isize; let mut e2: isize;
+
+        // Sort points by their Y value (lowest value first).
+        if point0.y > point1.y { (point0, point1) = (point1, point0) }
+        if point0.y > point2.y { (point0, point2) = (point2, point0) }
+        if point1.y > point2.y { (point1, point2) = (point2, point1) }
+
+        // Starting points
+        t1x = point0.x as isize; t2x = t1x;
+        y = point0.y as isize;
+
+        // Determine dx and dy for points 0 and 1
+        dx1 = point1.x as isize - point0.x as isize;
+        if dx1 < 0 {dx1 = -dx1; sign_x1 = -1; }
+        else { sign_x1 = 1; }
+        dy1 = point1.y as isize - point0.y as isize;
+
+        // Determine dx and dy for points 0 and 2
+        dx2 = point2.x as isize - point0.x as isize;
+        if dx2 < 0 { dx2 = -dx2;    sign_x2 = -1; }
+        else { sign_x2 = 1; }
+        dy2 = point2.y as isize - point0.y as isize;
+
+
+        if dy1 > dx1 {   // swap values
+			(dx1, dy1) = (dy1, dx1);
+			changed1 = true;
+		}
+		if dy2 > dx2 {   // swap values
+			(dy2, dx2) = (dx2, dy2);
+			changed2 = true;
+		}
+
+        e2 = dx2 >> 1;
+        if point0.y != point1.y {
+            // Not a flat top.
+                // If there is a flat top, skip to 'next
+            e1 = dx1 >> 1;
+
+            let mut i = 0;
+            'outer: while i < dx1 {
+                t1xp = 0;   t2xp = 0;
+                if t1x < t2x    { min_x = t1x;    max_x = t2x; }
+                else { min_x = t2x;    max_x = t1x }
+                
+
+                // process first line until y value is about to change
+                'start: while i < dx1 {
+                    i += 1;
+                    e1 += dy1;
+
+                    while e1 >= dx1 {
+                        e1 -= dx1;
+                        if changed1 { t1xp = sign_x1 as isize; }
+                        else { break 'start; } // goto next1
+                    }
+
+                    if changed1 { break; }
+                    else { t1x += sign_x1 as isize; }
+                }
+
+                // process second line until y value is about to change
+                'next1: loop {
+                    e2 += dy2;
+
+                    while e2 >= dx2 {
+                        e2 -= dx2;
+                        if changed2 { t2xp = sign_x2 as isize; }
+                        else { break 'next1 } // goto next 2
+                    }
+
+                    if changed2 { break; }
+                    else { t2x += sign_x2 as isize; }
+                }
+
+                '_next2: {
+                    if min_x > t1x { min_x = t1x; } if min_x > t2x { min_x = t2x; }
+                    if max_x < t1x { max_x = t1x; } if max_x < t2x { max_x = t2x }
+
+                    //  Draw line from min x to max x on y
+                    self.draw_line(
+                        Point{x: min_x as usize, y: y as usize}, 
+                        Point{x: max_x as usize, y: y as usize}, 
+                        color
+                    );
+
+                    // Now increase y
+                    if !changed1 { t1x += sign_x1 as isize; }
+                    t1x += t1xp;
+
+                    if !changed2 { t2x += sign_x2 as isize; }
+                    t2x += t2xp;
+
+                    y += 1;
+                    if y == point1.y as isize { break 'outer; }
+                }
+            }
+        }
+        
+        // else point0.y == point1.y
+        '_next: {
+            // Second half
+            dx1 = point2.x as isize - point1.x as isize;
+            if dx1 < 0 { dx1 = -dx1;    sign_x1 = -1; }
+            else { sign_x1 = 1; }
+
+            dy1 = point2.y as isize - point1.y as isize;
+            t1x = point1.x as isize;
+
+
+            if dy1 > dx1 {
+                (dy1, dx1) = (dx1, dy1);
+                changed1 = true;
+            }
+            else { changed1 = false; }
+
+            e1 = dx1 >> 1;
+
+            let mut i = 0;
+            while i <= dx1 {
+                t1xp = 0;   t2xp = 0;
+
+                if t1x < t2x { min_x = t1x; max_x = t2x; }
+                else { min_x = t2x; max_x = t1x; }
+
+                // Process first line until y is about to change
+                'first: while i < dx1 {
+                    e1 += dy1;
+
+                    while e1 >= dx1 {
+                        e1 -= dx1;
+                        if changed1 { t1xp = sign_x1 as isize; break;} 
+                        else {  break 'first; } // goto next3
+                    }
+                    
+                    if changed1 { break; }
+                    else { t1x += sign_x1 as isize; }
+
+                    if i < dx1 { i += 1};
+                    
+                }
+
+                'next3: {
+                    // process second line until y value is about to change
+                    while t2x != point2.x as isize {
+                        e2 += dy2;
+                        while e2 >= dx2 {
+                            e2 -= dx2;
+                            if changed2 { t2xp = sign_x2 as isize; }
+                            else { break 'next3; } // goto next4
+                        }
+                        if changed2 { break; }
+                        else { t2x += sign_x2 as isize; }
+                    }
+                }
+
+                '_next4: {
+                    if min_x > t1x { min_x = t1x }  if min_x > t2x { min_x = t2x; }
+                    if max_x < t1x { max_x = t1x }  if max_x < t2x { max_x = t2x; }
+
+                    //  Draw line from min x to max x on y
+                    self.draw_line(
+                        Point{x: min_x as usize, y: y as usize}, 
+                        Point{x: max_x as usize, y: y as usize}, 
+                        color
+                    );
+
+                    if !changed1 { t1x += sign_x1 as isize; }
+                    t1x += t1xp;
+
+                    if !changed2 { t2x += sign_x2 as isize; }
+                    t2x += t2xp;
+
+                    y += 1;
+
+                    if y > point2.y as isize { return; }
+                }
+
+                i += 1;
+            }
+        }
     }
 
     pub fn render(&mut self) -> Result<()> {     
