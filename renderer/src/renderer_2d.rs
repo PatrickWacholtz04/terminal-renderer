@@ -26,8 +26,8 @@ use std::io::{Result, Stdout, Write, stdout};
 use std::{thread, time::Duration};
 
 
-const OUT_W:usize = 200;
-const OUT_H:usize = 100;
+const OUT_W:usize = 256;
+const OUT_H:usize = 256;
 
 #[derive(Default, Clone, Copy, Debug, PartialEq)]
 pub struct RGB {
@@ -113,7 +113,7 @@ impl Renderer {
             previous_buffer: vec![vec![RGB::default(); OUT_H]; OUT_W],
             draw_pixel: '▄',
             stdout: stdout(),
-            target_framerate: 30,
+            target_framerate: 15,
             first_frame: true,
         }
         
@@ -232,7 +232,11 @@ impl Renderer {
         let mut t1xp: isize;  let mut t2xp: isize;
 
         let mut changed1 = false;   let mut changed2 = false;
+
+        #[allow(unused_mut)]
         let mut sign_x1:i8;
+
+        #[allow(unused_mut)]
         let mut sign_x2:i8;
 
         let mut dx1: isize;   let mut dy1: isize;

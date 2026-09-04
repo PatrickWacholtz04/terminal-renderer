@@ -1,5 +1,6 @@
-use std::io::Result;
+use std::io::{BufRead, BufReader, Result};
 use std::{thread, time::Duration, time::Instant};
+use std::fs::File;
 
 use crate::renderer_2d::{
     Point,
@@ -18,6 +19,7 @@ struct Vec3d {
 #[derive(Default, Clone, Copy)]
 struct Triangle {
     p: [Vec3d; 3],
+    color: RGB,
 }
 
 #[derive(Default, Clone)]
@@ -36,108 +38,53 @@ struct Renderer {
     v_camera: Vec3d,
 }
 
+impl Mesh {
+    fn load_from_obj(&mut self, file_name: &str) -> Result<()> {
+        let file = File::open(file_name)?;
+        let reader = BufReader::new(file);
+
+        let color = RGB {r: 255, g: 0, b: 255};
+
+        let mut verts: Vec<Vec3d> = Vec::new();
+        for line in reader.lines() {
+            let line = line?;
+            
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            
+            if parts[0] == "v" {
+                let x: f32 = parts[1].parse().unwrap();
+                let y: f32 = parts[2].parse().unwrap();
+                let z: f32 = parts[3].parse().unwrap();
+                verts.push(
+                    Vec3d { x, y, z }
+                );
+            }
+
+            else if parts[0] == "f" {
+                let p0: usize = parts[1].parse().unwrap();
+                let p1: usize = parts[2].parse().unwrap();
+                let p2: usize = parts[3].parse().unwrap();
+
+                let p = [verts[p0 - 1], verts[p1 - 1], verts[p2 - 1]];
+                // let color = RGB::default();
+
+                self.tris.push(
+                    Triangle { p, color }
+                );
+            }
+
+        }
+
+        Ok(())
+    }
+
+
+}
+
 impl Renderer {
     fn new() -> Self {
-        let mesh_cube = Mesh {
-            tris: vec![
-                // Front face
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 0.0, y: 1.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 0.0 },
-                    ],
-                },
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 0.0, z: 0.0 },
-                    ],
-                },
-
-                // Back face
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 0.0, z: 1.0 },
-                        Vec3d { x: 1.0, y: 0.0, z: 1.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 1.0 },
-                    ],
-                },
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 0.0, z: 1.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 1.0 },
-                        Vec3d { x: 0.0, y: 1.0, z: 1.0 },
-                    ],
-                },
-
-                // Left face
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 0.0, y: 0.0, z: 1.0 },
-                        Vec3d { x: 0.0, y: 1.0, z: 1.0 },
-                    ],
-                },
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 0.0, y: 1.0, z: 1.0 },
-                        Vec3d { x: 0.0, y: 1.0, z: 0.0 },
-                    ],
-                },
-
-                // Right face
-                Triangle {
-                    p: [
-                        Vec3d { x: 1.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 1.0 },
-                    ],
-                },
-                Triangle {
-                    p: [
-                        Vec3d { x: 1.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 1.0 },
-                        Vec3d { x: 1.0, y: 0.0, z: 1.0 },
-                    ],
-                },
-
-                // Top face
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 1.0, z: 0.0 },
-                        Vec3d { x: 0.0, y: 1.0, z: 1.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 1.0 },
-                    ],
-                },
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 1.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 1.0 },
-                        Vec3d { x: 1.0, y: 1.0, z: 0.0 },
-                    ],
-                },
-
-                // Bottom face
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 0.0, z: 1.0 },
-                    ],
-                },
-                Triangle {
-                    p: [
-                        Vec3d { x: 0.0, y: 0.0, z: 0.0 },
-                        Vec3d { x: 1.0, y: 0.0, z: 1.0 },
-                        Vec3d { x: 0.0, y: 0.0, z: 1.0 },
-                    ],
-                },
-            ],
-        };
-
+        let mesh_cube = Mesh::default();
+        
         let mat_proj = Mat4x4::default();
 
         Self { 
@@ -164,6 +111,14 @@ impl Renderer {
         return o;
     }
 
+    fn get_color(input_color: RGB, factor: f32) -> RGB {
+        let r_new = input_color.r as f32 + (255.0 - input_color.r as f32) * factor;
+        let g_new = input_color.g as f32 + (255.0 - input_color.g as f32) * factor;
+        let b_new = input_color.b as f32 + (255.0 - input_color.b as f32) * factor;
+
+        return RGB { r: r_new as u8, g: g_new as u8, b: b_new as u8 };
+    }
+
 
 
 }
@@ -177,6 +132,10 @@ fn main() -> Result<()> {
     
 
     let mut renderer = Renderer::new();
+
+    // Load mesh from obj file
+    renderer.mesh_cube.load_from_obj("src/VideoShip.obj")?;
+    
 
     // Projection Matrix
     let f_near = 0.1f32;
@@ -255,9 +214,9 @@ fn main() -> Result<()> {
 
             // Offset onto screen
             let mut translated = rotated_zx;
-            translated.p[0].z = rotated_zx.p[0].z + 3.0;
-            translated.p[1].z = rotated_zx.p[1].z + 3.0;
-            translated.p[2].z = rotated_zx.p[2].z + 3.0;
+            translated.p[0].z = rotated_zx.p[0].z + 8.0;
+            translated.p[1].z = rotated_zx.p[1].z + 8.0;
+            translated.p[2].z = rotated_zx.p[2].z + 8.0;
 
             let mut normal = Vec3d::default();
             let mut line1 = Vec3d::default();
@@ -282,9 +241,19 @@ fn main() -> Result<()> {
             if (normal.x * translated.p[0].x - renderer.v_camera.x) +
                 (normal.y * translated.p[0].y - renderer.v_camera.y) +
                 (normal.z * translated.p[0].z - renderer.v_camera.z) < 0.0 {
+
+                // Illumination
+                let mut light_direction = Vec3d{x: 0.0, y: 0.0, z: -1.0};
+                let l = (light_direction.x *light_direction.x + light_direction.y*light_direction.y + light_direction.z*light_direction.z).sqrt();
+                light_direction.x /= l;  light_direction.y /= l;    light_direction.z /= l;
+
+                let dp = normal.x*light_direction.x + normal.y*light_direction.y + normal.z*light_direction.z;
+                translated.color = Renderer::get_color(tri.color, dp);
+
                 projected.p[0] = Renderer::multiply_matrix_vector(translated.p[0], renderer.mat_proj);
                 projected.p[1] = Renderer::multiply_matrix_vector(translated.p[1], renderer.mat_proj);
                 projected.p[2] = Renderer::multiply_matrix_vector(translated.p[2], renderer.mat_proj);
+                projected.color = translated.color;
 
                 // Scale into view
                 projected.p[0].x += 1.0;    projected.p[0].y += 1.0;
@@ -298,29 +267,26 @@ fn main() -> Result<()> {
                 projected.p[2].x *= 0.5 * renderer_2d.out_w as f32;
                 projected.p[2].y *= 0.5 * renderer_2d.out_h as f32;
 
+
                 // Rasterize triangle
                 
                 renderer_2d.fill_triangle(Point{x: projected.p[0].x as usize, y: projected.p[0].y as usize}, 
                                         Point{x: projected.p[1].x as usize, y: projected.p[1].y as usize},
                                         Point{x: projected.p[2].x as usize, y: projected.p[2].y as usize},
-                                        RGB{r: 255, g: 255, b:255}
+                                        projected.color
                 );
+
+                // renderer_2d.draw_triangle(Point{x: projected.p[0].x as usize, y: projected.p[0].y as usize}, 
+                //                         Point{x: projected.p[1].x as usize, y: projected.p[1].y as usize},
+                //                         Point{x: projected.p[2].x as usize, y: projected.p[2].y as usize},
+                //                         RGB { r: 0, g: 0, b: 0 }
+                // );
+
+
 
             }   
 
         }
-
-        
-        // renderer_2d.fill_triangle(
-        //     Point { x: 5, y: 5 },
-        //     Point { x: 5, y: 20 },
-        //     Point { x: 22, y: 13 },
-        //     RGB {
-        //         r: 255,
-        //         g: 255,
-        //         b: 255,
-        //     },
-        // );
 
         renderer_2d.render()?;
 
@@ -333,8 +299,6 @@ fn main() -> Result<()> {
 
 
     let result = renderer_2d::run(&mut renderer_2d, &mut input_handler);
-
-
     
     let _ = renderer_2d::restore_terminal(&mut renderer_2d);
 
