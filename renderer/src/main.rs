@@ -111,7 +111,11 @@ impl Renderer {
         return o;
     }
 
-    fn get_color(input_color: RGB, factor: f32) -> RGB {
+    fn get_color(input_color: RGB, mut factor: f32) -> RGB {
+        let num_shades = 4.0;
+        let level = (factor * num_shades).round() / num_shades;
+        factor = level * 0.8;
+
         let r_new = input_color.r as f32 + (255.0 - input_color.r as f32) * factor;
         let g_new = input_color.g as f32 + (255.0 - input_color.g as f32) * factor;
         let b_new = input_color.b as f32 + (255.0 - input_color.b as f32) * factor;
@@ -248,6 +252,7 @@ fn main() -> Result<()> {
                 light_direction.x /= l;  light_direction.y /= l;    light_direction.z /= l;
 
                 let dp = normal.x*light_direction.x + normal.y*light_direction.y + normal.z*light_direction.z;
+            
                 translated.color = Renderer::get_color(tri.color, dp);
 
                 projected.p[0] = Renderer::multiply_matrix_vector(translated.p[0], renderer.mat_proj);
@@ -279,7 +284,7 @@ fn main() -> Result<()> {
                 // renderer_2d.draw_triangle(Point{x: projected.p[0].x as usize, y: projected.p[0].y as usize}, 
                 //                         Point{x: projected.p[1].x as usize, y: projected.p[1].y as usize},
                 //                         Point{x: projected.p[2].x as usize, y: projected.p[2].y as usize},
-                //                         RGB { r: 0, g: 0, b: 0 }
+                //                         RGB { r: 255, g: 255, b: 255 }
                 // );
 
 
