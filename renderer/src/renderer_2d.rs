@@ -77,8 +77,9 @@ impl InputHandler {
         }
     }
 
-    pub fn update(&mut self) -> Result<()> {
+    pub fn update(&mut self) -> Result<Option<KeyCode>> {
         self.terminal_resized = false;
+
         while event::poll(Duration::ZERO)? {
             match event::read()? {
                 Event::Key(KeyEvent { code, .. }) => {
@@ -86,11 +87,13 @@ impl InputHandler {
                         KeyCode::Esc => {
                             self.exit = true;
                         }
-                        _ => {}
+                        _ => {
+                            return Ok(Some(code));
+                        }
                     }
                 }
 
-                Event::Resize(_width, _height) => {
+                Event::Resize(_, _) => {
                     self.terminal_resized = true;
                 }
 
@@ -98,8 +101,10 @@ impl InputHandler {
             }
         }
 
-        Ok(())
+        Ok(None)
     }
+
+
 
 }
 
