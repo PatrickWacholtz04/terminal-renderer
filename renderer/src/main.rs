@@ -58,6 +58,7 @@ impl Vec3d {
         }
     }
 
+    #[allow(unused)]
     fn mult(v: Vec3d, k: f32) -> Vec3d {
         return Vec3d {
             x: v.x * k,
@@ -66,6 +67,7 @@ impl Vec3d {
         }
     }
 
+    #[allow(unused)]
     fn div(v: Vec3d, k: f32) -> Vec3d {
         return Vec3d {
             x: v.x / k,
@@ -103,6 +105,7 @@ impl Vec3d {
 }
 
 impl Mat4x4 {
+    #[allow(unused)]
     fn make_identity() -> Mat4x4 {
         let mut identity = Mat4x4::default();
         identity.m[0][0] = 1.0;
@@ -389,8 +392,7 @@ fn main() -> Result<()> {
         trans_z += trans_z_input * f_theta * translation_speed;
         let translation = Mat4x4::make_translation(0.0, 0.0, trans_z);
 
-        let mut world = Mat4x4::make_identity();
-        world = Renderer::multiply_matrix_matrix(mat_rot_x, mat_rot_y);
+        let mut world = Renderer::multiply_matrix_matrix(mat_rot_x, mat_rot_y);
         world = Renderer::multiply_matrix_matrix(world, mat_rot_z);
         world = Renderer::multiply_matrix_matrix(world, translation);
 
@@ -405,14 +407,10 @@ fn main() -> Result<()> {
             transformed.p[2] = Renderer::multiply_matrix_vector(tri.p[2], world);
 
             // Calculate triangle normal
-            let mut normal = Vec3d::default();
-            let mut line1 = Vec3d::default();
-            let mut line2 = Vec3d::default();
+            let line1 = Vec3d::sub(transformed.p[1], transformed.p[0]);
+            let line2 = Vec3d::sub(transformed.p[2], transformed.p[0]);
 
-            line1 = Vec3d::sub(transformed.p[1], transformed.p[0]);
-            line2 = Vec3d::sub(transformed.p[2], transformed.p[0]);
-
-            normal = Vec3d::cross_product(line1, line2);
+            let mut normal = Vec3d::cross_product(line1, line2);
             normal = Vec3d::normal(normal);
 
             let v_camera_ray = Vec3d::sub(transformed.p[0], renderer.v_camera);
