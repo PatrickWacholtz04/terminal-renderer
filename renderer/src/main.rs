@@ -1,3 +1,4 @@
+use std::env;
 use std::io::{BufRead, BufReader, Result};
 use std::{thread, time::Duration, time::Instant};
 use std::fs::File;
@@ -293,7 +294,14 @@ fn main() -> Result<()> {
     let mut renderer = Renderer::new();
 
     // Load mesh from obj file
-    renderer.mesh_cube.load_from_obj("src/VideoShip.obj")?;
+    let binding = &"src/VideoShip.obj".to_string();
+
+    let args: Vec<String> = env::args().collect();
+    let file_path: &String = args
+        .get(1)
+        .unwrap_or(binding);
+    
+    renderer.mesh_cube.load_from_obj(file_path)?;
     
 
     // Projection Matrix
@@ -311,12 +319,14 @@ fn main() -> Result<()> {
     let target_frame_time = Duration::from_secs_f32(1.0 / renderer_2d.target_framerate as f32);
 
     let mut rot_x = 0.0;    let mut rot_y = 0.0;    let mut rot_z = 0.0;
+    let mut trans_z: f32= 5.0;
 
     loop {
         let frame_start = Instant::now();
         let elapsed_time = frame_start - start_time;
 
         let mut rot_x_input = 0.0;  let mut rot_y_input = 0.0;  let mut rot_z_input = 0.0;
+        let mut trans_z_input: f32 = 0.0;
 
         if let Some(key) = input_handler.update()? {
             match key {
@@ -338,8 +348,11 @@ fn main() -> Result<()> {
                 KeyCode::Char('q') => {
                     rot_z_input = -1.0;
                 }
-                KeyCode::Char('a') => {
-                    // move left
+                KeyCode::Char('r') => {
+                    trans_z_input = 1.0;
+                }
+                KeyCode::Char('f') => {
+                    trans_z_input = -1.0;
                 }
                 _ => {}
             }
@@ -370,9 +383,11 @@ fn main() -> Result<()> {
         let mat_rot_x = Mat4x4::make_rotation_x(rot_x);
         let mat_rot_y = Mat4x4::make_rotation_y(rot_y);
         let mat_rot_z = Mat4x4::make_rotation_z(rot_z);
-        
-
-        let translation = Mat4x4::make_translation(0.0, 0.0, 10.0);
+     
+        // Translation matrix
+        let translation_speed = 0.02;
+        trans_z += trans_z_input * f_theta * translation_speed;
+        let translation = Mat4x4::make_translation(0.0, 0.0, trans_z);
 
         let mut world = Mat4x4::make_identity();
         world = Renderer::multiply_matrix_matrix(mat_rot_x, mat_rot_y);
